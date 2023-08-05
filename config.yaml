@@ -1,0 +1,67 @@
+---
+test_name: curl json check
+
+stages:
+  - name: hit the endpoint and validate+save some json
+    # max_retries: 3
+    command: 'curl https://edgediag.services.atlassian.com/echo -H "Foobar: 1" -H "Cookie: hello there"'
+    stdout:
+      json:
+        payload:
+          body: {}
+          headers:
+            foobar:
+              - "1"
+      save:
+        cookie: payload.headers.cookie[0]
+
+  - name: send the cookie as a different header
+    # max_retries: 3
+    command: 'curl https://edgediag.services.atlassian.com/echo -H "Foobar: {{ cookie }}"'
+    stdout:
+      json:
+        payload:
+          body: {}
+          headers:
+            foobar:
+              - "{{ cookie }}"
+---
+test_name: curl regex check
+
+stages:
+  - name: hit the endpoint
+    max_retries: 3
+    command: 'curl https://edgediag.services.atlassian.com/echo'
+    stdout:
+      regex: '"x-forwarded-for":\s*\["(?P<xff>[\d\., ]+)"]'
+
+  - name: hit the endpoint twice
+    max_retries: 3
+    command: 'curl https://edgediag.services.atlassian.com/echo -H "Previous-XFF: {{ 1 }}"'
+    stdout:
+      regex: '"previous-xff":\s*\["(?P<xff>[\d\., ]+)"]'
+
+  - name: hit the endpoint thrice
+    max_retries: 3
+    command: 'curl https://edgediag.services.atlassian.com/echo -H "Second-Previous-XFF: {{ xff }}"'
+    stdout:
+      regex: '"second-previous-xff":\s*\["[\d\., ]+"]'
+
+---
+test_name: query string test
+
+stages:
+  - name: request the echo page and save a value
+    command: 'curl https://edgediag.services.atlassian.com/echo'
+    stdout:
+      save:
+        example: payload.headers."x-request-id"[0]
+
+  - name: insert the request id into the query string
+    command: 'curl https://edgediag.services.atlassian.com/echo?prev-id={{example}}'
+    stdout:
+      json:
+        payload:
+          query_args:
+            prev-id: "{{example}}"
+
