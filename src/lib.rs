@@ -14,6 +14,18 @@ mod json;
 
 use config::{check_stdout, format_variables, Backreference, CheckConfig, CheckStage};
 
+macro_rules! tags {
+    ($($key:ident: $value:expr),* $(,)?) => {
+        {
+            let mut map = HashMap::new();
+            $(
+                map.insert(stringify!($key).to_string(), $value.to_string());
+            )*
+            Some(map)
+        }
+    };
+}
+
 pub struct CommandProbe {
     config: Vec<CheckConfig>,
     metrics: cadence::StatsdClient,
@@ -52,17 +64,11 @@ impl CommandProbe {
         }
         if successful_stages == check.stages.len() {
             info!(check.test_name, status = "Check passed");
-            self.increment_counter(
-                "check.passed",
-                Some(tags(vec![("test_name", &check.test_name)])),
-            );
+            self.increment_counter("check.passed", tags!(test_name: &check.test_name));
             true
         } else {
             error!(check.test_name, status = "Check failed",);
-            self.increment_counter(
-                "check.failed",
-                Some(tags(vec![("test_name", &check.test_name)])),
-            );
+            self.increment_counter("check.failed", tags!(test_name: &check.test_name));
             false
         }
     }
@@ -89,7 +95,7 @@ impl CommandProbe {
                         info!(test_name, stage.name, status = "Stage passed");
                         self.increment_counter(
                             "stage.passed",
-                            Some(tags(vec![("test_name", test_name), ("stage", &stage.name)])),
+                            tags!(test_name: test_name, stage: &stage.name),
                         );
                         return Ok(());
                     } else {
@@ -117,7 +123,7 @@ impl CommandProbe {
 
         self.increment_counter(
             "stage.failed",
-            Some(tags(vec![("test_name", test_name), ("stage", &stage.name)])),
+            tags!(test_name: test_name, stage: &stage.name),
         );
         Err(anyhow!("Stage failed after {} retries", stage.max_retries))
     }
@@ -155,12 +161,4 @@ fn read_configuration(p: PathBuf) -> Vec<CheckConfig> {
     serde_yaml::Deserializer::from_str(&yaml_content)
         .map(|i| CheckConfig::deserialize(i).unwrap())
         .collect()
-}
-
-fn tags<T: std::fmt::Display>(t: Vec<(&str, T)>) -> HashMap<String, String> {
-    let mut ret = HashMap::new();
-    for (key, value) in t.into_iter() {
-        ret.insert(key.to_string(), value.to_string());
-    }
-    ret
 }
