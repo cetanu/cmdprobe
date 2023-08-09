@@ -16,6 +16,7 @@ pub struct CheckStage {
     #[serde(default = "default_retries")]
     pub max_retries: u32,
     pub delay_before: Option<u64>,
+    pub delay_after: Option<u64>,
     pub command: String,
     pub matchers: Vec<StdoutMatcher>,
 }
