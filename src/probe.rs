@@ -76,34 +76,15 @@ impl CommandProbe {
                 sleep(delay);
             }
 
-            let output_matched = match &stage.check {
-                CheckCommand::Shell(cmd) => match execute_command(cmd, saved) {
-                    Ok(stdout) => check_stdout(stage, test_name, &stdout, saved),
-                    Err(err) => {
-                        warn!(test_name, stage.name, status = "Stage failed", error = %err);
-                        false
-                    }
-                },
+            let execution = match &stage.check {
+                CheckCommand::Shell(cmd) => execute_command(cmd, saved),
                 CheckCommand::HttpRequest {
                     url,
                     headers,
                     method,
-                } => {
-                    let mut request = ureq::request(&method, &url);
-                    for (key, value) in headers.iter() {
-                        request = request.set(key, value);
-                    }
-                    match request.call() {
-                        Ok(response) => {
-                            check_stdout(stage, test_name, &response.into_string().unwrap(), saved)
-                        }
-                        Err(err) => {
-                            warn!(test_name, stage.name, status = "Stage failed", error = %err);
-                            false
-                        }
-                    }
-                }
-            };
+                } => execute_request(method, url, headers),
+            }
+            .map(|output| check_stdout(stage, test_name, &output, saved));
 
             if let Some(delay) = stage.delay_after {
                 debug!(
@@ -113,20 +94,25 @@ impl CommandProbe {
                 sleep(delay);
             }
 
-            if output_matched {
-                info!(test_name, stage.name, status = "Stage passed");
-                self.increment_counter(
-                    "stage.passed",
-                    tags!(test_name: test_name, stage: &stage.name),
-                );
-                return Ok(());
-            } else {
-                warn!(
-                    test_name,
-                    stage.name,
-                    status = "Output does not match expectation",
-                    attempt = attempt
-                );
+            match execution {
+                Ok(matched) => {
+                    if matched {
+                        info!(test_name, stage.name, status = "Stage passed");
+                        self.increment_counter(
+                            "stage.passed",
+                            tags!(test_name: test_name, stage: &stage.name),
+                        );
+                        return Ok(());
+                    } else {
+                        warn!(
+                            test_name,
+                            stage.name,
+                            status = "Output does not match expectation",
+                            attempt = attempt
+                        );
+                    }
+                }
+                Err(e) => warn!(test_name, stage.name, status = "Stage failed", error = %e),
             }
         }
 
@@ -163,6 +149,17 @@ fn execute_command(command: &str, context: &HashMap<Backreference, String>) -> R
         }
         Err(err) => Err(anyhow!("Error executing command: {}", err)),
     }
+}
+
+fn execute_request(method: &str, url: &str, headers: &HashMap<String, String>) -> Result<String> {
+    let mut request = ureq::request(method, url);
+    for (key, value) in headers.iter() {
+        request = request.set(key, value);
+    }
+    request
+        .call()
+        .map(|response| response.into_string().unwrap())
+        .map_err(|err| err.into())
 }
 
 fn read_configuration(p: PathBuf) -> Vec<CheckConfig> {

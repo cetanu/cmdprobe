@@ -20,7 +20,7 @@ fn metrics_client(addr: String) -> StatsdClient {
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
     socket.set_nonblocking(true).unwrap();
     let host = {
-        if let Some((host, port)) = addr.split_once(":") {
+        if let Some((host, port)) = addr.split_once(':') {
             (host, port.parse().unwrap())
         } else {
             panic!("Invalid statsd host supplied, please use <address>:<port>");
