@@ -4,7 +4,7 @@ test_name: curl json check
 stages:
   - name: hit the endpoint and validate+save some json
     # max_retries: 3
-    command: 'curl https://edgediag.services.atlassian.com/echo -H "Foobar: 1" -H "Cookie: hello there"'
+    check: 'curl https://edgediag.services.atlassian.com/echo -H "Foobar: 1" -H "Cookie: hello there"'
     matchers:
       - json:
           payload:
@@ -17,7 +17,7 @@ stages:
 
   - name: send the cookie as a different header
     # max_retries: 3
-    command: 'curl https://edgediag.services.atlassian.com/echo -H "Foobar: {{ cookie }}"'
+    check: 'curl https://edgediag.services.atlassian.com/echo -H "Foobar: {{ cookie }}"'
     matchers:
       - json:
           payload:
@@ -31,19 +31,19 @@ test_name: curl regex check
 stages:
   - name: hit the endpoint
     max_retries: 3
-    command: 'curl https://edgediag.services.atlassian.com/echo'
+    check: 'curl https://edgediag.services.atlassian.com/echo'
     matchers:
       - regex: '"x-forwarded-for":\s*\["(?P<xff>[\d\., ]+)"]'
 
   - name: hit the endpoint twice
     max_retries: 3
-    command: 'curl https://edgediag.services.atlassian.com/echo -H "Previous-XFF: {{ 1 }}"'
+    check: 'curl https://edgediag.services.atlassian.com/echo -H "Previous-XFF: {{ 1 }}"'
     matchers:
       - regex: '"previous-xff":\s*\["(?P<xff>[\d\., ]+)"]'
 
   - name: hit the endpoint thrice
     max_retries: 3
-    command: 'curl https://edgediag.services.atlassian.com/echo -H "Second-Previous-XFF: {{ xff }}"'
+    check: 'curl https://edgediag.services.atlassian.com/echo -H "Second-Previous-XFF: {{ xff }}"'
     matchers:
       - regex: '"second-previous-xff":\s*\["[\d\., ]+"]'
 
@@ -52,13 +52,13 @@ test_name: query string test
 
 stages:
   - name: request the echo page and save a value
-    command: 'curl https://edgediag.services.atlassian.com/echo'
+    check: 'curl https://edgediag.services.atlassian.com/echo'
     matchers:
       - save:
           example: payload.headers."x-request-id"[0]
 
   - name: insert the request id into the query string
-    command: 'curl https://edgediag.services.atlassian.com/echo?prev-id={{example}}'
+    check: 'curl https://edgediag.services.atlassian.com/echo?prev-id={{example}}'
     matchers:
       - json:
           payload:
@@ -70,7 +70,7 @@ test_name: http request test
 
 stages:
   - name: hit the endpoint using http
-    command:
+    check:
       url: https:/edgediag.services.atlassian.com/echo
       method: GET
       headers:

@@ -76,8 +76,8 @@ impl CommandProbe {
                 std::thread::sleep(std::time::Duration::from_secs(delay));
             }
 
-            match &stage.command {
-                CheckCommand::Process(cmd) => match execute_command(cmd, saved) {
+            match &stage.check {
+                CheckCommand::Shell(cmd) => match execute_command(cmd, saved) {
                     Ok(stdout) => {
                         let matched = check_stdout(stage, test_name, &stdout, saved);
                         if matched {
@@ -100,13 +100,13 @@ impl CommandProbe {
                         warn!(test_name, stage.name, status = "Stage failed", error = %err)
                     }
                 },
-                CheckCommand::Request {
+                CheckCommand::HttpRequest {
                     url,
                     headers,
                     method,
                 } => {
                     // TODO: asap auth somewhere here
-                    let mut request = ureq::request(method, url);
+                    let mut request = ureq::request(&method, &url);
                     for (key, value) in headers.iter() {
                         request = request.set(key, value);
                     }

@@ -17,15 +17,15 @@ pub struct CheckStage {
     pub max_retries: u32,
     pub delay_before: Option<u64>,
     pub delay_after: Option<u64>,
-    pub command: CheckCommand,
+    pub check: CheckCommand,
     pub matchers: Vec<StdoutMatcher>,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum CheckCommand {
-    Process(String),
-    Request {
+    Shell(String),
+    HttpRequest {
         url: String,
         headers: HashMap<String, String>,
         method: String,
