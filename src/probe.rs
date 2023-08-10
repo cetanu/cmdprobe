@@ -9,7 +9,9 @@ use rayon::prelude::*;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
 
-use crate::checks::{check_stdout, format_variables, Backreference, CheckConfig, CheckStage};
+use crate::checks::{
+    check_stdout, format_variables, Backreference, CheckCommand, CheckConfig, CheckStage,
+};
 use crate::tags;
 
 pub struct CommandProbe {
@@ -74,27 +76,70 @@ impl CommandProbe {
                 std::thread::sleep(std::time::Duration::from_secs(delay));
             }
 
-            match execute_command(&stage.command, saved) {
-                Ok(stdout) => {
-                    let matched = check_stdout(stage, test_name, &stdout, saved);
-                    if matched {
-                        info!(test_name, stage.name, status = "Stage passed");
-                        self.increment_counter(
-                            "stage.passed",
-                            tags!(test_name: test_name, stage: &stage.name),
-                        );
-                        return Ok(());
-                    } else {
-                        warn!(
-                            test_name,
-                            stage.name,
-                            status = "Output does not match expectation",
-                            attempt = attempt
-                        );
+            match &stage.command {
+                CheckCommand::Process(cmd) => match execute_command(cmd, saved) {
+                    Ok(stdout) => {
+                        let matched = check_stdout(stage, test_name, &stdout, saved);
+                        if matched {
+                            info!(test_name, stage.name, status = "Stage passed");
+                            self.increment_counter(
+                                "stage.passed",
+                                tags!(test_name: test_name, stage: &stage.name),
+                            );
+                            return Ok(());
+                        } else {
+                            warn!(
+                                test_name,
+                                stage.name,
+                                status = "Output does not match expectation",
+                                attempt = attempt
+                            );
+                        }
                     }
-                }
-                Err(err) => {
-                    warn!(test_name, stage.name, status = "Stage failed", error = %err)
+                    Err(err) => {
+                        warn!(test_name, stage.name, status = "Stage failed", error = %err)
+                    }
+                },
+                CheckCommand::Request {
+                    url,
+                    headers,
+                    method,
+                } => {
+                    // TODO: asap auth somewhere here
+                    let mut request = ureq::request(method, url);
+                    for (key, value) in headers.iter() {
+                        request = request.set(key, value);
+                    }
+                    let response = request.call();
+
+                    match response {
+                        Ok(response) => {
+                            let matched = check_stdout(
+                                stage,
+                                test_name,
+                                &response.into_string().unwrap(),
+                                saved,
+                            );
+                            if matched {
+                                info!(test_name, stage.name, status = "Stage passed");
+                                self.increment_counter(
+                                    "stage.passed",
+                                    tags!(test_name: test_name, stage: &stage.name),
+                                );
+                                return Ok(());
+                            } else {
+                                warn!(
+                                    test_name,
+                                    stage.name,
+                                    status = "Output does not match expectation",
+                                    attempt = attempt
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            warn!(test_name, stage.name, status = "Stage failed", error = %err)
+                        }
+                    }
                 }
             };
 

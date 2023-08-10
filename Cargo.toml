@@ -31,3 +31,5 @@ cadence = "0.29"
 # Parallelism
 rayon = "1.7"
 
+# HTTP
+ureq = "2.7"

@@ -17,8 +17,20 @@ pub struct CheckStage {
     pub max_retries: u32,
     pub delay_before: Option<u64>,
     pub delay_after: Option<u64>,
-    pub command: String,
+    pub command: CheckCommand,
     pub matchers: Vec<StdoutMatcher>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum CheckCommand {
+    Process(String),
+    Request {
+        url: String,
+        headers: HashMap<String, String>,
+        method: String,
+        // TODO: asap auth
+    },
 }
 
 #[derive(Hash, Clone, Debug, PartialEq, Eq)]
@@ -40,6 +52,7 @@ pub enum StdoutMatcher {
         json: Option<Value>,
         save: Option<HashMap<String, String>>,
     },
+    // TODO: jmespath
 }
 
 fn default_retries() -> u32 {

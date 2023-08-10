@@ -5,7 +5,7 @@ use cadence::{BufferedUdpMetricSink, QueuingMetricSink, StatsdClient};
 use clap::Parser;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use cmdprobe::CommandProbe;
+use cmdprobe::probe::CommandProbe;
 
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
