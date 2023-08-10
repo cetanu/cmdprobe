@@ -73,31 +73,15 @@ impl CommandProbe {
                     test_name,
                     stage.name, "Sleeping {} seconds before check execution", delay
                 );
-                std::thread::sleep(std::time::Duration::from_secs(delay));
+                sleep(delay);
             }
 
-            match &stage.check {
+            let output_matched = match &stage.check {
                 CheckCommand::Shell(cmd) => match execute_command(cmd, saved) {
-                    Ok(stdout) => {
-                        let matched = check_stdout(stage, test_name, &stdout, saved);
-                        if matched {
-                            info!(test_name, stage.name, status = "Stage passed");
-                            self.increment_counter(
-                                "stage.passed",
-                                tags!(test_name: test_name, stage: &stage.name),
-                            );
-                            return Ok(());
-                        } else {
-                            warn!(
-                                test_name,
-                                stage.name,
-                                status = "Output does not match expectation",
-                                attempt = attempt
-                            );
-                        }
-                    }
+                    Ok(stdout) => check_stdout(stage, test_name, &stdout, saved),
                     Err(err) => {
-                        warn!(test_name, stage.name, status = "Stage failed", error = %err)
+                        warn!(test_name, stage.name, status = "Stage failed", error = %err);
+                        false
                     }
                 },
                 CheckCommand::HttpRequest {
@@ -105,39 +89,17 @@ impl CommandProbe {
                     headers,
                     method,
                 } => {
-                    // TODO: asap auth somewhere here
                     let mut request = ureq::request(&method, &url);
                     for (key, value) in headers.iter() {
                         request = request.set(key, value);
                     }
-                    let response = request.call();
-
-                    match response {
+                    match request.call() {
                         Ok(response) => {
-                            let matched = check_stdout(
-                                stage,
-                                test_name,
-                                &response.into_string().unwrap(),
-                                saved,
-                            );
-                            if matched {
-                                info!(test_name, stage.name, status = "Stage passed");
-                                self.increment_counter(
-                                    "stage.passed",
-                                    tags!(test_name: test_name, stage: &stage.name),
-                                );
-                                return Ok(());
-                            } else {
-                                warn!(
-                                    test_name,
-                                    stage.name,
-                                    status = "Output does not match expectation",
-                                    attempt = attempt
-                                );
-                            }
+                            check_stdout(stage, test_name, &response.into_string().unwrap(), saved)
                         }
                         Err(err) => {
-                            warn!(test_name, stage.name, status = "Stage failed", error = %err)
+                            warn!(test_name, stage.name, status = "Stage failed", error = %err);
+                            false
                         }
                     }
                 }
@@ -148,7 +110,23 @@ impl CommandProbe {
                     test_name,
                     stage.name, "Sleeping {} seconds after check execution", delay
                 );
-                std::thread::sleep(std::time::Duration::from_secs(delay));
+                sleep(delay);
+            }
+
+            if output_matched {
+                info!(test_name, stage.name, status = "Stage passed");
+                self.increment_counter(
+                    "stage.passed",
+                    tags!(test_name: test_name, stage: &stage.name),
+                );
+                return Ok(());
+            } else {
+                warn!(
+                    test_name,
+                    stage.name,
+                    status = "Output does not match expectation",
+                    attempt = attempt
+                );
             }
         }
 
@@ -192,4 +170,8 @@ fn read_configuration(p: PathBuf) -> Vec<CheckConfig> {
     serde_yaml::Deserializer::from_str(&yaml_content)
         .map(|i| CheckConfig::deserialize(i).unwrap())
         .collect()
+}
+
+fn sleep(delay: u64) {
+    std::thread::sleep(std::time::Duration::from_secs(delay));
 }
