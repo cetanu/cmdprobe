@@ -1,7 +1,9 @@
+use jmespath::Variable;
 use regex::Regex;
 use serde::Deserialize;
-use serde_json::{Map, Value};
+use serde_json::{Map, Value as JsonValue};
 use std::collections::HashMap;
+use std::rc::Rc;
 use tracing::debug;
 
 #[derive(Deserialize, Debug)]
@@ -40,6 +42,16 @@ pub enum Backreference {
 }
 
 #[derive(Deserialize, Debug)]
+pub enum Operation {
+    Eq,
+    Ne,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+}
+
+#[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum StdoutMatcher {
     Exact {
@@ -49,10 +61,14 @@ pub enum StdoutMatcher {
         regex: String,
     },
     Json {
-        json: Option<Value>,
+        json: Option<JsonValue>,
         save: Option<HashMap<String, String>>,
     },
-    // TODO: jmespath
+    JmesPath {
+        jmespath: String,
+        operation: Operation,
+        value: JsonValue,
+    },
 }
 
 fn default_retries() -> u32 {
@@ -75,29 +91,47 @@ pub fn format_variables(input: &str, map: &HashMap<Backreference, String>) -> St
 
 /// Walks a json structure and replaces {{ variables }} in strings with values from a map
 pub fn format_nested_variables(
-    value: &Value,
+    value: &JsonValue,
     replacements: &HashMap<Backreference, String>,
-) -> Value {
+) -> JsonValue {
     match value {
-        Value::Object(obj) => {
+        JsonValue::Object(obj) => {
             let mut new_obj = Map::new();
             for (k, v) in obj {
                 new_obj.insert(k.clone(), format_nested_variables(v, replacements));
             }
-            Value::Object(new_obj)
+            JsonValue::Object(new_obj)
         }
-        Value::Array(arr) => {
+        JsonValue::Array(arr) => {
             let new_arr = arr
                 .iter()
                 .map(|v| format_nested_variables(v, replacements))
                 .collect();
-            Value::Array(new_arr)
+            JsonValue::Array(new_arr)
         }
-        Value::String(s) => {
+        JsonValue::String(s) => {
             let new_s = format_variables(s, replacements);
-            Value::String(new_s)
+            JsonValue::String(new_s)
         }
         _ => value.clone(),
+    }
+}
+
+fn var_to_json(var: Rc<Variable>) -> JsonValue {
+    match &*var {
+        Variable::Null => JsonValue::Null,
+        Variable::Bool(b) => JsonValue::Bool(*b),
+        Variable::Number(n) => JsonValue::Number(n.clone()),
+        Variable::String(s) => JsonValue::String(s.clone()),
+        Variable::Array(arr) => {
+            JsonValue::Array(arr.iter().map(|v| var_to_json(Rc::clone(v))).collect())
+        }
+        Variable::Object(obj) => JsonValue::Object(
+            obj.iter()
+                .map(|(k, v)| (k.clone(), var_to_json(Rc::clone(v))))
+                .collect(),
+        ),
+        _ => panic!(),
     }
 }
 
@@ -113,6 +147,19 @@ pub fn check_stdout(
 
     for matcher in &stage.matchers {
         let result = match matcher {
+            StdoutMatcher::JmesPath {
+                jmespath: expression,
+                operation: op,
+                value: expected,
+            } => {
+                let expr = jmespath::compile(expression).unwrap();
+                let data = jmespath::Variable::from_json(output).unwrap();
+                let value = expr.search(data).unwrap();
+                match op {
+                    Operation::Eq => &var_to_json(value) == expected,
+                    _ => panic!(),
+                }
+            }
             StdoutMatcher::Exact { exact: expected } => {
                 debug!(
                     test_name,

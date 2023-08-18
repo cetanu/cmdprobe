@@ -82,3 +82,13 @@ stages:
             headers:
               foo:
                 - "bar"
+  - name: hit the endpoint and evaluate using jmespath
+    check:
+      url: https:/edgediag.services.atlassian.com/echo
+      method: GET
+      headers:
+        foo: bar
+    matchers:
+      - jmespath: payload.headers.foo[0]
+        operation: eq
+        value: bar

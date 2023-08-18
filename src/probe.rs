@@ -51,11 +51,11 @@ impl CommandProbe {
             }
         }
         if successful_stages == check.stages.len() {
-            info!(check.test_name, status = "Check passed");
+            info!(test_name = check.test_name, status = "Check passed");
             self.increment_counter("check.passed", tags!(test_name: &check.test_name));
             true
         } else {
-            error!(check.test_name, status = "Check failed",);
+            error!(test_name = check.test_name, status = "Check failed",);
             self.increment_counter("check.failed", tags!(test_name: &check.test_name));
             false
         }
