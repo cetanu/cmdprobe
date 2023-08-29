@@ -2,6 +2,12 @@
 name = "cmdprobe"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A tool for executing checks and validating their outputs"
+authors = ["Vasilios Syrakis <vsyrakis@protonmail.com>"]
+readme = "README.md"
+repository = "https://github.com/cetanu/cmdprobe"
+keywords = ["check", "healthcheck"]
 
 [dependencies]
 # Logs
