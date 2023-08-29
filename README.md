@@ -54,3 +54,8 @@ docker-compose up -d
 # Run cmdprobe with the local config file
 RUST_LOG=cmdprobe=INFO cargo run
 ```
+
+## Inspiration
+
+I modelled this tool after [Tavern](https://taverntesting.github.io/) so that my
+team would have an easy time understanding how to use it and migrate existing tests across.
