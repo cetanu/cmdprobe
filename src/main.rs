@@ -1,4 +1,5 @@
 use std::net::UdpSocket;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use cadence::{BufferedUdpMetricSink, QueuingMetricSink, StatsdClient};
@@ -10,6 +11,14 @@ use cmdprobe::probe::CommandProbe;
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
+    #[clap(
+        short,
+        long,
+        default_value = "cmdprobe.yaml",
+        env = "CMDPROBE_CONFIG_FILE"
+    )]
+    pub config_file: PathBuf,
+
     #[clap(short, long, default_value = "0.0.0.0:0", env = "CMDPROBE_STATSD_ADDR")]
     // By default it will send stats nowhere
     pub statsd_address: String,
@@ -40,6 +49,6 @@ fn main() -> Result<()> {
         .compact()
         .init();
 
-    let probe = CommandProbe::new("config.yaml".into(), statsd_client);
+    let probe = CommandProbe::new(args.config_file, statsd_client);
     probe.run_checks()
 }

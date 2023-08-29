@@ -176,7 +176,8 @@ pub fn check_stdout(
                     expected = expected,
                     response = output
                 );
-                let pattern = Regex::new(expected).expect("Not a valid regex");
+                let expected = format_variables(expected, saved);
+                let pattern = Regex::new(&expected).expect("Not a valid regex");
                 let captures = pattern.captures(output).unwrap();
 
                 // Store capture groups into map

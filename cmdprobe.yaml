@@ -1,0 +1,85 @@
+---
+test_name: curl json check
+
+stages:
+  - name: hit the endpoint and validate+save some json
+    # max_retries: 3
+    check: 'curl http://localhost/json'
+    matchers:
+      - json:
+          slideshow:
+            slides:
+              - title: "Wake up to WonderWidgets!"
+        save:
+          author: slideshow.slides[0].title
+
+  - name: send the author as a header
+    # max_retries: 3
+    check: 'curl http://localhost/headers -H "Author: {{ author }}"'
+    matchers:
+      - json:
+          headers:
+            Author: "{{ author }}"
+---
+test_name: curl regex check
+
+stages:
+  - name: find the path
+    max_retries: 3
+    check: 'curl http://localhost/robots.txt'
+    matchers:
+      - regex: 'Disallow: (?P<path>\S*)'
+
+  - name: hit the path with numbered capture group
+    max_retries: 3
+    check: 'curl http://localhost/{{ 1 }}'
+    matchers:
+      - regex: "(YOU SHOULDN'T BE HERE)"
+
+  - name: hit the path with named capture group and use previous numbered group in matcher
+    max_retries: 3
+    check: 'curl http://localhost/{{ path }}'
+    matchers:
+      - regex: "{{ 1 }}"
+
+---
+test_name: json save without matcher test
+
+stages:
+  - name: request the anything page and save a value
+    check: 'curl http://localhost/anything'
+    matchers:
+      - save:
+          example: headers."user-agent"
+
+  - name: insert the agent into the query string
+    check: 'curl http://localhost/anything?agent={{example}}'
+    matchers:
+      - json:
+          args:
+            agent: "{{example}}"
+
+---
+test_name: http request test
+
+stages:
+  - name: hit the anything endpoint using http
+    check:
+      url: http:/localhost/anything
+      method: GET
+      headers:
+        foo: bar
+    matchers:
+      - json:
+          headers:
+            Foo: bar
+  - name: hit the json endpoint and evaluate using jmespath
+    check:
+      url: http:/localhost/json
+      method: GET
+      headers:
+        foo: bar
+    matchers:
+      - jmespath: slideshow.slides[1].items[0]
+        operation: eq
+        value: "Why <em>WonderWidgets</em> are great"
