@@ -3,14 +3,14 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use cadence::prelude::*;
 use rayon::prelude::*;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
 
 use crate::checks::{
-    check_stdout, format_variables, Backreference, CheckCommand, CheckConfig, CheckStage,
+    Backreference, CheckCommand, CheckConfig, CheckStage, check_stdout, format_variables,
 };
 use crate::tags;
 
@@ -164,7 +164,7 @@ fn execute_request(method: &str, url: &str, headers: &HashMap<String, String>) -
 
 fn read_configuration(p: PathBuf) -> Vec<CheckConfig> {
     let yaml_content =
-        fs::read_to_string(p.clone()).expect(format!("Error reading config file {p:?}").as_str());
+        fs::read_to_string(p.clone()).unwrap_or_else(|_| panic!("Error reading config file {p:?}"));
     serde_yaml::Deserializer::from_str(&yaml_content)
         .map(|i| CheckConfig::deserialize(i).unwrap())
         .collect()

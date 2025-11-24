@@ -80,8 +80,8 @@ pub fn format_variables(input: &str, map: &HashMap<Backreference, String>) -> St
     let mut output = input.to_owned();
     for (key, value) in map {
         let pattern = match key {
-            Backreference::Named(name) => format!(r"\{{\{{\s*{}\s*\}}\}}", name),
-            Backreference::Numbered(index) => format!(r"\{{\{{\s*{}\s*\}}\}}", index.to_string()),
+            Backreference::Named(name) => format!(r"\{{\{{\s*{name}\s*\}}\}}"),
+            Backreference::Numbered(index) => format!(r"\{{\{{\s*{index}\s*\}}\}}"),
         };
         let re = Regex::new(&pattern).unwrap();
         output = re.replace_all(&output, value).to_string();
@@ -232,9 +232,8 @@ pub fn check_stdout(
                                 jmespath::Variable::Bool(b) => b.to_string(),
                                 jmespath::Variable::Null => "null".to_string(),
                                 ref obj => panic!(
-                                "Attempt to save non-stringable value using jmespath {expr}: {}",
-                                obj.to_string()
-                            ),
+                                    "Attempt to save non-stringable value using jmespath {expr}: {obj}"
+                                ),
                             };
                             saved.insert(Backreference::Named(key.to_string()), value);
                         }
