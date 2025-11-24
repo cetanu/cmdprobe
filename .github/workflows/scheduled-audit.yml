@@ -1,0 +1,58 @@
+name: Scheduled Security Audit
+
+on:
+  schedule:
+    # Run every Wednesday at 10:00 AM AEST (00:00 UTC)
+    - cron: '0 0 * * 3'
+  workflow_dispatch: # Allow manual triggering
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  audit:
+    name: Weekly Security Audit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-audit-
+          ${{ runner.os }}-cargo-
+    
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+      
+    - name: Run cargo audit
+      run: cargo audit
+      
+    - name: Create Issue on Vulnerability Found
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: 'Security Vulnerabilities Found in Dependencies',
+            body: `A scheduled security audit found vulnerabilities in the project dependencies.
+            
+            **Audit Date:** ${new Date().toISOString().split('T')[0]}
+            
+            Please review the workflow logs and update vulnerable dependencies:
+            ${context.payload.repository.html_url}/actions/runs/${context.runId}
+            
+            Run \`cargo audit\` locally to see detailed information about the vulnerabilities.`,
+            labels: ['security', 'dependencies', 'audit']
+          });
