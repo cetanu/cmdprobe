@@ -1,58 +1,88 @@
 # cmdprobe
-A utility for running arbitrary commands and checking their output
 
+`cmdprobe` runs shell commands or HTTP requests and checks their output with
+exact, regular-expression, JSON-subset, or JMESPath matchers.
 
-## Install
+## Quick start
+
+The repository includes a complete, runnable [example configuration](cmdprobe.yaml).
+It demonstrates multiple YAML documents, retries, captured variables, JSON
+matching, saved JMESPath values, and HTTP checks.
+
 ```shell
 cargo install cmdprobe
+cmdprobe --config-file ./cmdprobe.yaml
 ```
 
+For local development, start the example HTTP service first:
+
+```shell
+docker compose up -d
+RUST_LOG=cmdprobe=info cargo run -- --config-file ./cmdprobe.yaml
+```
+
+Configuration files may contain multiple YAML documents. Each document is one
+check, with a `test_name` and an ordered list of `stages`:
+
+```yaml
+test_name: curl json check
+stages:
+  - name: get the JSON document
+    check: 'curl http://localhost/json'
+    matchers:
+      - json:
+          slideshow:
+            slides:
+              - title: "Wake up to WonderWidgets!"
+        save:
+          author: slideshow.slides[0].title
+```
+
+See [`cmdprobe.yaml`](cmdprobe.yaml) for the full example and the available
+configuration shapes.
 
 ## Usage
 
-### Basic execution
-See the example `cmdprobe.yaml` file for what configuration is available.
+The config path defaults to `cmdprobe.yaml` and can also be set with
+`CMDPROBE_CONFIG_FILE`.
 
-Construct your own configuration file, and then run cmdprobe against it to execute
-all the checks that you need to do.
+Each stage supports:
 
-```shell
-cmdprobe --config-file /etc/cmdprobe.yml
-```
+- `check`: a shell command string, or an HTTP request with `url`, `method`, and
+  optional `headers`.
+- `matchers`: `exact`, `regex`, `json`, or `jmespath` checks. JSON matchers
+  check that the expected value is a subset of the response.
+- `max_retries`, `delay_before`, and `delay_after`, with delays in seconds.
+- `{{ name }}` and `{{ 1 }}` variable references populated by `save` or regex
+  capture groups.
 
-### Emitting statsd metrics
-You can supply a statsd host and `cmdprobe` will emit metrics for each test & stage.
+Shell commands and configuration are trusted input: shell checks are executed
+through `sh -c`.
+
+### StatsD metrics
+
+StatsD output is disabled by default. Supply an address to emit metrics for
+the probe, check, and stage results:
 
 ```shell
 cmdprobe --config-file /etc/cmdprobe.yml --statsd-address 127.0.0.1:8125
 ```
 
-The following metrics will be emitted:
+The following counters are emitted:
 
-```
-# Did the entire probe run fail/succeed
-cmdprobe.probe.failed
-cmdprobe.probe.passed
-
-# Did one check (a collection of stages) fail/succeed
-cmdprobe.check.failed
-cmdprobe.check.passed
-
-# Did an indidivual stage within a check fail/succeed
-cmdprobe.stage.failed
-cmdprobe.stage.passed
+```text
+cmdprobe.probe.failed / cmdprobe.probe.passed
+cmdprobe.check.failed / cmdprobe.check.passed
+cmdprobe.stage.failed / cmdprobe.stage.passed
 ```
 
-
-## Running locally
-Ensure you have a `cmdprobe.yaml` file in the current directory
+## Development
 
 ```shell
-# Start the httpbin for testing
-docker-compose up -d
-
-# Run cmdprobe with the local config file
-RUST_LOG=cmdprobe=INFO cargo run
+cargo fmt --all -- --check
+cargo check --all-targets --all-features
+cargo test --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 ## Inspiration

@@ -22,7 +22,7 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -32,8 +32,14 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-
     
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+    - name: Check compilation
+      run: cargo check --all-targets --all-features
+
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --all-targets --all-features --verbose
 
   clippy:
     name: Clippy
@@ -47,7 +53,7 @@ jobs:
         components: clippy
         
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -87,7 +93,7 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry

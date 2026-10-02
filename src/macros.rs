@@ -2,7 +2,7 @@
 macro_rules! tags {
     ($($key:ident: $value:expr),* $(,)?) => {
         {
-            let mut map = HashMap::new();
+            let mut map = ::std::collections::HashMap::new();
             $(
                 map.insert(stringify!($key).to_string(), $value.to_string());
             )*

@@ -65,7 +65,7 @@ test_name: http request test
 stages:
   - name: hit the anything endpoint using http
     check:
-      url: http:/localhost/anything
+      url: http://localhost/anything
       method: GET
       headers:
         foo: bar
@@ -75,7 +75,7 @@ stages:
             Foo: bar
   - name: hit the json endpoint and evaluate using jmespath
     check:
-      url: http:/localhost/json
+      url: http://localhost/json
       method: GET
       headers:
         foo: bar

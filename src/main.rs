@@ -1,8 +1,8 @@
 use std::net::UdpSocket;
 use std::path::PathBuf;
 
-use anyhow::Result;
-use cadence::{BufferedUdpMetricSink, QueuingMetricSink, StatsdClient};
+use anyhow::{Context, Result, anyhow};
+use cadence::{BufferedUdpMetricSink, NopMetricSink, QueuingMetricSink, StatsdClient};
 use clap::Parser;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -19,36 +19,45 @@ pub struct Args {
     )]
     pub config_file: PathBuf,
 
-    #[clap(short, long, default_value = "0.0.0.0:0", env = "CMDPROBE_STATSD_ADDR")]
-    // By default it will send stats nowhere
-    pub statsd_address: String,
+    #[clap(short, long, env = "CMDPROBE_STATSD_ADDR", value_name = "HOST:PORT")]
+    /// Send StatsD metrics to this address. Metrics are disabled by default.
+    pub statsd_address: Option<String>,
 }
 
-fn metrics_client(addr: String) -> StatsdClient {
+fn metrics_client(addr: Option<&str>) -> Result<StatsdClient> {
     let prefix = "cmdprobe";
-    let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-    socket.set_nonblocking(true).unwrap();
-    let host = {
-        if let Some((host, port)) = addr.split_once(':') {
-            (host, port.parse().unwrap())
-        } else {
-            panic!("Invalid statsd host supplied, please use <address>:<port>");
-        }
+    let Some(addr) = addr else {
+        return Ok(StatsdClient::from_sink(prefix, NopMetricSink));
     };
-    let udp_sink = BufferedUdpMetricSink::from(host, socket).unwrap();
+    let (host, port) = addr
+        .rsplit_once(':')
+        .ok_or_else(|| anyhow!("invalid StatsD address {addr:?}; use <host>:<port>"))?;
+    if host.is_empty() {
+        return Err(anyhow!("invalid StatsD address {addr:?}; host is empty"));
+    }
+    let port = port
+        .parse::<u16>()
+        .with_context(|| format!("invalid StatsD port {port:?}"))?;
+    let socket = UdpSocket::bind("0.0.0.0:0").context("failed to bind StatsD socket")?;
+    socket
+        .set_nonblocking(true)
+        .context("failed to configure StatsD socket")?;
+    let udp_sink = BufferedUdpMetricSink::from((host, port), socket)
+        .map_err(|error| anyhow!(error))
+        .context("failed to create StatsD sink")?;
     let queuing_sink = QueuingMetricSink::from(udp_sink);
-    StatsdClient::from_sink(prefix, queuing_sink)
+    Ok(StatsdClient::from_sink(prefix, queuing_sink))
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let statsd_client = metrics_client(args.statsd_address);
+    let statsd_client = metrics_client(args.statsd_address.as_deref())?;
 
     FmtSubscriber::builder()
         .with_env_filter(EnvFilter::from_default_env())
         .compact()
         .init();
 
-    let probe = CommandProbe::new(args.config_file, statsd_client);
+    let probe = CommandProbe::new(args.config_file, statsd_client)?;
     probe.run_checks()
 }

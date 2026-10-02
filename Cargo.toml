@@ -2,6 +2,7 @@
 name = "cmdprobe"
 version = "0.1.1"
 edition = "2024"
+rust-version = "1.85"
 license = "MIT"
 description = "A tool for executing checks and validating their outputs"
 authors = ["Vasilios Syrakis <vsyrakis@protonmail.com>"]
@@ -11,29 +12,29 @@ keywords = ["check", "healthcheck"]
 
 [dependencies]
 # Logs
-tracing = "0.1"
-tracing-subscriber = {version = "0.3", features = ["json", "env-filter"]}
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.20", features = ["json", "env-filter"] }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
-serde_json = "1.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_yaml = "0.9.34"
+serde_json = "1.0.145"
 
 # Parsing
-jmespath = "0.3"
-regex = "1.5"
+jmespath = "0.3.0"
+regex = "1.12.2"
 
 # Errors
-anyhow = "1.0"
+anyhow = "1.0.100"
 
 # CLI
-clap = {version = "4.3", features = ["derive", "env"]}
+clap = { version = "4.5.53", features = ["derive", "env"] }
 
 # Metrics
-cadence = "0.29"
+cadence = "0.29.1"
 
 # Parallelism
-rayon = "1.7"
+rayon = "1.11.0"
 
 # HTTP
-ureq = "2.7"
+ureq = "2.12.1"

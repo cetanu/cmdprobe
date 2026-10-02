@@ -3,15 +3,14 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use cadence::prelude::*;
 use rayon::prelude::*;
 use serde::Deserialize;
 use tracing::{debug, error, info, warn};
 
-use crate::checks::{
-    Backreference, CheckCommand, CheckConfig, CheckStage, check_stdout, format_variables,
-};
+use crate::config::{CheckCommand, CheckConfig, CheckStage};
+use crate::matching::{Backreference, check_stdout, format_variables};
 use crate::tags;
 
 pub struct CommandProbe {
@@ -20,9 +19,9 @@ pub struct CommandProbe {
 }
 
 impl CommandProbe {
-    pub fn new(config: PathBuf, metrics: cadence::StatsdClient) -> Self {
-        let config = read_configuration(config);
-        Self { config, metrics }
+    pub fn new(config: PathBuf, metrics: cadence::StatsdClient) -> Result<Self> {
+        let config = read_configuration(&config)?;
+        Ok(Self { config, metrics })
     }
 
     pub fn run_checks(&self) -> Result<()> {
@@ -30,7 +29,7 @@ impl CommandProbe {
             .config
             .par_iter()
             .map(|c| self.run_check(c))
-            .all(|boolean| boolean);
+            .reduce(|| true, |left, right| left && right);
         if passed {
             info!("All checks passed.");
             self.increment_counter("probe.passed", None);
@@ -67,7 +66,15 @@ impl CommandProbe {
         stage: &CheckStage,
         saved: &mut HashMap<Backreference, String>,
     ) -> Result<()> {
+        if stage.max_retries == 0 {
+            return Err(anyhow!(
+                "stage {:?} has max_retries set to zero",
+                stage.name
+            ));
+        }
+
         for attempt in 0..stage.max_retries {
+            let mut attempt_saved = saved.clone();
             if let Some(delay) = stage.delay_before {
                 debug!(
                     test_name,
@@ -77,14 +84,15 @@ impl CommandProbe {
             }
 
             let execution = match &stage.check {
-                CheckCommand::Shell(cmd) => execute_command(cmd, saved),
+                CheckCommand::Shell(cmd) => execute_command(cmd, &attempt_saved),
                 CheckCommand::HttpRequest {
                     url,
                     headers,
                     method,
-                } => execute_request(method, url, headers),
+                } => execute_request(method, url, headers, &attempt_saved),
             }
-            .map(|output| check_stdout(stage, test_name, &output, saved));
+            .map(|output| check_stdout(stage, test_name, &output, &mut attempt_saved))
+            .and_then(|result| result);
 
             if let Some(delay) = stage.delay_after {
                 debug!(
@@ -97,6 +105,7 @@ impl CommandProbe {
             match execution {
                 Ok(matched) => {
                     if matched {
+                        *saved = attempt_saved;
                         info!(test_name, stage.name, status = "Stage passed");
                         self.increment_counter(
                             "stage.passed",
@@ -151,22 +160,33 @@ fn execute_command(command: &str, context: &HashMap<Backreference, String>) -> R
     }
 }
 
-fn execute_request(method: &str, url: &str, headers: &HashMap<String, String>) -> Result<String> {
-    let mut request = ureq::request(method, url);
+fn execute_request(
+    method: &str,
+    url: &str,
+    headers: &HashMap<String, String>,
+    context: &HashMap<Backreference, String>,
+) -> Result<String> {
+    let url = format_variables(url, context);
+    let mut request = ureq::request(method, &url);
     for (key, value) in headers.iter() {
-        request = request.set(key, value);
+        request = request.set(key, &format_variables(value, context));
     }
     request
         .call()
-        .map(|response| response.into_string().unwrap())
-        .map_err(|err| err.into())
+        .map_err(|err| anyhow!(err))?
+        .into_string()
+        .context("failed to read HTTP response body")
 }
 
-fn read_configuration(p: PathBuf) -> Vec<CheckConfig> {
-    let yaml_content =
-        fs::read_to_string(p.clone()).unwrap_or_else(|_| panic!("Error reading config file {p:?}"));
+fn read_configuration(path: &std::path::Path) -> Result<Vec<CheckConfig>> {
+    let yaml_content = fs::read_to_string(path)
+        .with_context(|| format!("error reading config file {}", path.display()))?;
     serde_yaml::Deserializer::from_str(&yaml_content)
-        .map(|i| CheckConfig::deserialize(i).unwrap())
+        .enumerate()
+        .map(|(index, document)| {
+            CheckConfig::deserialize(document)
+                .with_context(|| format!("error parsing YAML document {}", index + 1))
+        })
         .collect()
 }
 
