@@ -167,21 +167,26 @@ fn execute_request(
     context: &HashMap<Backreference, String>,
 ) -> Result<String> {
     let url = format_variables(url, context);
-    let mut request = ureq::request(method, &url);
+    let mut request = ureq::http::Request::builder().method(method).uri(&url);
     for (key, value) in headers.iter() {
-        request = request.set(key, &format_variables(value, context));
+        request = request.header(key, format_variables(value, context));
     }
-    request
-        .call()
+    let request = request
+        .body(())
+        .map_err(|error| anyhow!(error))
+        .context("failed to build HTTP request")?;
+    let response = ureq::run(request)
         .map_err(|err| anyhow!(err))?
-        .into_string()
-        .context("failed to read HTTP response body")
+        .body_mut()
+        .read_to_string()
+        .context("failed to read HTTP response body")?;
+    Ok(response)
 }
 
 fn read_configuration(path: &std::path::Path) -> Result<Vec<CheckConfig>> {
     let yaml_content = fs::read_to_string(path)
         .with_context(|| format!("error reading config file {}", path.display()))?;
-    serde_yaml::Deserializer::from_str(&yaml_content)
+    yaml_serde::Deserializer::from_str(&yaml_content)
         .enumerate()
         .map(|(index, document)| {
             CheckConfig::deserialize(document)

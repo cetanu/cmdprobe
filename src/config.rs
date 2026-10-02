@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn repository_example_config_deserializes() {
-        let documents = serde_yaml::Deserializer::from_str(include_str!("../cmdprobe.yaml"))
+        let documents = yaml_serde::Deserializer::from_str(include_str!("../cmdprobe.yaml"))
             .map(CheckConfig::deserialize)
             .collect::<Result<Vec<_>, _>>()
             .expect("example configuration should deserialize");

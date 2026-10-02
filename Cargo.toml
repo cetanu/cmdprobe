@@ -12,29 +12,29 @@ keywords = ["check", "healthcheck"]
 
 [dependencies]
 # Logs
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.20", features = ["json", "env-filter"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
 
 # Serialization
-serde = { version = "1.0.228", features = ["derive"] }
-serde_yaml = "0.9.34"
-serde_json = "1.0.145"
+serde = { version = "1.0.229", features = ["derive"] }
+yaml_serde = "0.10.7"
+serde_json = "1.0.151"
 
 # Parsing
-jmespath = "0.3.0"
-regex = "1.12.2"
+jmespath = "0.5.0"
+regex = "1.13.1"
 
 # Errors
-anyhow = "1.0.100"
+anyhow = "1.0.104"
 
 # CLI
-clap = { version = "4.5.53", features = ["derive", "env"] }
+clap = { version = "4.6.7", features = ["derive", "env"] }
 
 # Metrics
-cadence = "0.29.1"
+cadence = "1.8.0"
 
 # Parallelism
-rayon = "1.11.0"
+rayon = "1.12.0"
 
 # HTTP
-ureq = "2.12.1"
+ureq = "3.4.2"
