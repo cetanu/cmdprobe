@@ -1,0 +1,11 @@
+[workspace]
+# Keep publishing gated on merging the release PR. The release-pr command still
+# updates the PR after every successful push to master.
+release_always = false
+
+# Include every commit when deciding whether to prepare a release.
+release_commits = ".*"
+
+# release-plz publishes the crate before creating its GitHub release.
+git_release_enable = true
+git_release_draft = false
