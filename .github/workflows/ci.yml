@@ -5,6 +5,7 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -82,7 +83,7 @@ jobs:
   release:
     name: Release (release-plz)
     needs: [test, clippy, audit]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -99,11 +100,24 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: Run release-plz release
+      if: github.event_name == 'push'
       uses: release-plz/action@v0.5
       with:
         command: release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish crate with Trusted Publishing
+      if: github.event_name == 'workflow_dispatch'
+      run: cargo publish --locked
+
+    - name: Create GitHub release
+      if: github.event_name == 'workflow_dispatch'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "cmdprobe") | .version')"
+        gh release create "$version" --title "cmdprobe $version" --generate-notes
 
   release-pr:
     name: Prepare Release PR (release-plz)
